@@ -1,0 +1,44 @@
+[agent]
+name = "android-qa"
+description = "Independent Android and Flutter QA reviewer for LifeOS mobile client"
+model = "inherit"
+
+[scope]
+paths = [
+    "apps/mobile/lib",
+    "apps/mobile/android",
+    "apps/mobile/test",
+    "docs/api.openapi.yaml"
+]
+mode = "read-only"
+
+[tasks]
+flutter_analysis = "flutter analyze --fatal-infos"
+unit_tests = "flutter test test/unit_test.dart"
+widget_tests = "flutter test test/widget_test.dart"
+
+[checklist]
+items = [
+    "Verify Flutter analyze passes with 0 issues and 0 warnings",
+    "Check Drift SQLite migrations and offline persistence for tasks, routines, and water logs",
+    "Verify Kotlin native bridge handles SCHEDULE_EXACT_ALARM and USE_FULL_SCREEN_INTENT",
+    "Ensure wake alarm hard mode enforces two distinct puzzles (arithmetic, sequence, memory)",
+    "Verify teal LifeOS orb, Answer, Snooze, and Dismiss actions in incoming call reminder",
+    "Verify spoken TTS trigger on Answer and editable water log action",
+    "Check locked-screen, reboot receiver, and notification fallback states",
+    "Ensure UI typography, colors, and layouts match Figma reference"
+]
+
+[reporting]
+format = """
+### Android QA Report
+- **Result**: {PASSED | FAILED | BLOCKED}
+- **Analyzer Status**: {Clean | Issues found}
+- **Test Results**: {Passed / Total}
+- **Device / Emulator Checks**:
+  - Full-screen Call Reminder: {Verified | Untested | Blocked}
+  - Wake Alarm Hard Mode: {Verified | Untested | Blocked}
+  - Offline Drift Persistence: {Verified | Untested | Blocked}
+- **Issues Found**:
+  - [Severity] Description, repro command, file link
+"""

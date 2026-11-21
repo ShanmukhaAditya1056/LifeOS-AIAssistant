@@ -1,0 +1,45 @@
+[agent]
+name = "integration-qa"
+description = "End-to-end integration QA agent verifying the full journey across backend and mobile"
+model = "inherit"
+
+[scope]
+paths = [
+    "docs/api.openapi.yaml",
+    "docs/MVP.md",
+    "docs/HANDOFF.md",
+    "services/api",
+    "apps/mobile"
+]
+mode = "read-only"
+
+[e2e_journey]
+step_1 = "Source Assignment Sync: Trigger Classroom/Gmail import via API or mock fixture"
+step_2 = "Task Inbox: Verify coursework card renders with official deadline, evidence, and source link"
+step_3 = "Proposal & Approval: User approves task; verify idempotent persistence and study slot scheduling"
+step_4 = "Today & Weekly Agenda: Verify scheduled slot appears on Today dashboard without collision"
+step_5 = "Call Reminder: Verify native call alert triggers with teal orb, spoken brief, and Mark Done action"
+step_6 = "Offline & Reconciliation: Test offline action queue and sync on network reconnection"
+
+[acceptance_criteria]
+no_duplicate_tasks = true
+isolated_user_data = true
+respect_quiet_hours = true
+preserve_official_deadlines = true
+sub_30s_meal_logging = true
+
+[reporting]
+format = """
+### Integration QA Journey Report
+- **Overall Status**: {PASSED | FAILED | BLOCKED}
+- **Contract Version**: {Version}
+- **Steps Verified**:
+  1. Source Sync: {Pass/Fail}
+  2. Inbox Card: {Pass/Fail}
+  3. Approval & Scheduling: {Pass/Fail}
+  4. Today Agenda: {Pass/Fail}
+  5. Call Reminder & Speech: {Pass/Fail}
+  6. Offline Sync: {Pass/Fail}
+- **Anomalies / Mismatches**:
+  - [Severity] Summary, contract mismatch or state drift, repro details
+"""

@@ -1,0 +1,723 @@
+openapi: 3.0.3
+info:
+  title: LifeOS API
+  description: Backend API contract for LifeOS personal assistant (Aditya Madala).
+  version: 1.0.0
+servers:
+  - url: http://localhost:3000/api/v1
+    description: Local development server
+paths:
+  /health:
+    get:
+      summary: Health check
+      description: Returns current API server health, database connectivity, and version.
+      operationId: getHealth
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  timestamp:
+                    type: string
+                    format: date-time
+                    example: '2026-11-22T06:15:00.000Z'
+                  version:
+                    type: string
+                    example: 1.0.0
+
+  /tasks:
+    get:
+      summary: List tasks and coursework
+      operationId: getTasks
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [inbox, approved, in_progress, completed, dismissed]
+        - name: fromDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: toDate
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: List of tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Task'
+    post:
+      summary: Create a manual task
+      operationId: createTask
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTaskDto'
+      responses:
+        '201':
+          description: Task created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+
+  /tasks/{id}:
+    get:
+      summary: Get task details
+      operationId: getTaskById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Task details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '404':
+          description: Task not found
+    patch:
+      summary: Update task
+      operationId: updateTask
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTaskDto'
+      responses:
+        '200':
+          description: Task updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+
+  /tasks/{id}/approve:
+    post:
+      summary: Approve inbox task
+      operationId: approveTask
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                studySlotStart:
+                  type: string
+                  format: date-time
+                finishByDate:
+                  type: string
+                  format: date
+                reminderPreference:
+                  $ref: '#/components/schemas/ReminderPreference'
+      responses:
+        '200':
+          description: Task approved and scheduled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+
+  /routine/schedule:
+    get:
+      summary: Get daily schedule blocks
+      operationId: getRoutineSchedule
+      responses:
+        '200':
+          description: Daily routine blocks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RoutineBlock'
+    put:
+      summary: Update daily routine schedule
+      operationId: updateRoutineSchedule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/RoutineBlock'
+      responses:
+        '200':
+          description: Routine schedule updated
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RoutineBlock'
+
+  /routine/briefing:
+    get:
+      summary: Get morning briefing
+      operationId: getMorningBriefing
+      responses:
+        '200':
+          description: Morning briefing text and key items
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MorningBriefing'
+
+  /reminders:
+    get:
+      summary: List pending reminders
+      operationId: getReminders
+      responses:
+        '200':
+          description: List of scheduled reminders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Reminder'
+    post:
+      summary: Schedule a reminder
+      operationId: createReminder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReminderDto'
+      responses:
+        '201':
+          description: Reminder scheduled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Reminder'
+
+  /reminders/{id}/action:
+    post:
+      summary: Process action on active reminder (Call or Notification)
+      operationId: processReminderAction
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - action
+              properties:
+                action:
+                  type: string
+                  enum: [answer, snooze, dismiss, mark_done, log_water]
+                snoozeMinutes:
+                  type: integer
+                  default: 5
+                waterAmountMl:
+                  type: integer
+      responses:
+        '200':
+          description: Action processed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  nextReminderAt:
+                    type: string
+                    format: date-time
+                    nullable: true
+
+  /assistant/query:
+    post:
+      summary: Process JARVIS assistant voice or text query
+      operationId: assistantQuery
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - input
+              properties:
+                input:
+                  type: string
+                  example: "What's next?"
+                mode:
+                  type: string
+                  enum: [voice, text]
+                  default: voice
+      responses:
+        '200':
+          description: Assistant response and suggested action proposals
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssistantResponse'
+
+  /tracking/meals:
+    get:
+      summary: Get meal logs for a date
+      operationId: getMealLogs
+      parameters:
+        - name: date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Meal logs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MealLog'
+    post:
+      summary: Log a meal
+      operationId: logMeal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateMealDto'
+      responses:
+        '201':
+          description: Meal logged
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MealLog'
+
+  /tracking/water:
+    get:
+      summary: Get water intake for date
+      operationId: getWaterLog
+      parameters:
+        - name: date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Water log details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WaterLogSummary'
+    post:
+      summary: Add water intake
+      operationId: addWater
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - amountMl
+              properties:
+                amountMl:
+                  type: integer
+                  example: 250
+      responses:
+        '200':
+          description: Water added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WaterLogSummary'
+
+  /tracking/water/undo:
+    post:
+      summary: Undo last water entry
+      operationId: undoWater
+      responses:
+        '200':
+          description: Last water entry reverted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WaterLogSummary'
+
+  /sync/status:
+    get:
+      summary: Get Google Classroom & Gmail sync status
+      operationId: getSyncStatus
+      responses:
+        '200':
+          description: Connector status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncStatus'
+
+components:
+  schemas:
+    ReminderPreference:
+      type: string
+      enum: [call_me, notification_only, off]
+      default: call_me
+
+    Task:
+      type: object
+      required:
+        - id
+        - title
+        - status
+        - reminderPreference
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [inbox, approved, in_progress, completed, dismissed]
+        officialDeadline:
+          type: string
+          format: date-time
+          nullable: true
+        deadlineStatus:
+          type: string
+          enum: [confirmed, time_unspecified, deadline_unconfirmed]
+        finishByDate:
+          type: string
+          format: date
+          nullable: true
+        studySlotStart:
+          type: string
+          format: date-time
+          nullable: true
+        studySlotDurationMinutes:
+          type: integer
+          nullable: true
+        reminderPreference:
+          $ref: '#/components/schemas/ReminderPreference'
+        sourceType:
+          type: string
+          enum: [manual, google_classroom, gmail]
+        sourceEvidence:
+          type: string
+          nullable: true
+        sourceUrl:
+          type: string
+          nullable: true
+
+    CreateTaskDto:
+      type: object
+      required:
+        - title
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        officialDeadline:
+          type: string
+          format: date-time
+        finishByDate:
+          type: string
+          format: date
+        studySlotStart:
+          type: string
+          format: date-time
+        studySlotDurationMinutes:
+          type: integer
+        reminderPreference:
+          $ref: '#/components/schemas/ReminderPreference'
+
+    UpdateTaskDto:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [inbox, approved, in_progress, completed, dismissed]
+        finishByDate:
+          type: string
+          format: date
+        studySlotStart:
+          type: string
+          format: date-time
+        reminderPreference:
+          $ref: '#/components/schemas/ReminderPreference'
+
+    RoutineBlock:
+      type: object
+      required:
+        - id
+        - name
+        - startTime
+        - endTime
+        - daysOfWeek
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+          example: "Library Focus Session"
+        startTime:
+          type: string
+          example: "15:00"
+        endTime:
+          type: string
+          example: "17:00"
+        daysOfWeek:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+            maximum: 7
+          example: [1, 2, 3, 4, 5]
+        subBlocks:
+          type: array
+          items:
+            type: object
+            properties:
+              title:
+                type: string
+              startOffsetMinutes:
+                type: integer
+              durationMinutes:
+                type: integer
+
+    MorningBriefing:
+      type: object
+      required:
+        - spokenText
+        - firstCommitment
+        - breakfast
+        - topStudyTask
+      properties:
+        spokenText:
+          type: string
+          example: "Good morning Aditya. Wake up confirmed. Your first commitment is College at 8:00 AM. Breakfast is oats and chia seeds. Your priority study task is Software Engineering Assignment 3."
+        firstCommitment:
+          type: string
+          example: "College at 8:00 AM"
+        breakfast:
+          type: string
+          example: "50g oats, 1 tsp chia seeds, water/milk"
+        topStudyTask:
+          type: string
+          example: "SE Assignment 3 (Library block at 3:10 PM)"
+
+    Reminder:
+      type: object
+      required:
+        - id
+        - title
+        - scheduledAt
+        - preference
+      properties:
+        id:
+          type: string
+          format: uuid
+        taskId:
+          type: string
+          format: uuid
+          nullable: true
+        title:
+          type: string
+        spokenMessage:
+          type: string
+        scheduledAt:
+          type: string
+          format: date-time
+        preference:
+          $ref: '#/components/schemas/ReminderPreference'
+        isWaterReminder:
+          type: boolean
+          default: false
+        status:
+          type: string
+          enum: [pending, active, snoozed, answered, dismissed, completed]
+
+    CreateReminderDto:
+      type: object
+      required:
+        - title
+        - scheduledAt
+      properties:
+        taskId:
+          type: string
+          format: uuid
+        title:
+          type: string
+        spokenMessage:
+          type: string
+        scheduledAt:
+          type: string
+          format: date-time
+        preference:
+          $ref: '#/components/schemas/ReminderPreference'
+
+    AssistantResponse:
+      type: object
+      required:
+        - replyText
+        - spokenText
+      properties:
+        replyText:
+          type: string
+        spokenText:
+          type: string
+        proposedAction:
+          type: object
+          properties:
+            actionType:
+              type: string
+              enum: [schedule_study, set_reminder, mark_task_done, log_water]
+            summary:
+              type: string
+            parameters:
+              type: object
+
+    MealLog:
+      type: object
+      required:
+        - id
+        - mealType
+        - loggedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        mealType:
+          type: string
+          enum: [breakfast, lunch, pre_gym, dinner, snack]
+        itemsDescription:
+          type: string
+          example: "Rice, 4 eggs, 100g chicken, moong dal"
+        photoPath:
+          type: string
+          nullable: true
+        estimatedCalories:
+          type: integer
+          nullable: true
+        estimatedCostInr:
+          type: number
+          nullable: true
+        loggedAt:
+          type: string
+          format: date-time
+
+    CreateMealDto:
+      type: object
+      required:
+        - mealType
+        - itemsDescription
+      properties:
+        mealType:
+          type: string
+          enum: [breakfast, lunch, pre_gym, dinner, snack]
+        itemsDescription:
+          type: string
+        photoPath:
+          type: string
+        estimatedCalories:
+          type: integer
+        estimatedCostInr:
+          type: number
+
+    WaterLogSummary:
+      type: object
+      required:
+        - totalMl
+        - targetMl
+        - entriesCount
+      properties:
+        totalMl:
+          type: integer
+          example: 2250
+        targetMl:
+          type: integer
+          default: 4000
+          example: 4000
+        entriesCount:
+          type: integer
+          example: 6
+        lastEntryAt:
+          type: string
+          format: date-time
+
+    SyncStatus:
+      type: object
+      required:
+        - classroomConnected
+        - gmailConnected
+      properties:
+        classroomConnected:
+          type: boolean
+        gmailConnected:
+          type: boolean
+        lastClassroomSyncAt:
+          type: string
+          format: date-time
+          nullable: true
+        lastGmailSyncAt:
+          type: string
+          format: date-time
+          nullable: true
+        errorMessage:
+          type: string
+          nullable: true
